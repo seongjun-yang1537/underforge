@@ -8,8 +8,15 @@ namespace Underforge
         {
             SDFGenerateJob job = new SDFGenerateJob
             {
-
+                volume = volume,
+                type = config.type,
+                offset = config.offset,
+                noiseScale = config.noiseScale,
+                noiseAmp = config.noiseAmplitude,
+                noiseOffset = config.noiseSeed
             };
+
+            return job.Schedule(volume.densities.Length, 64, dependency);
         }
     }
 }
