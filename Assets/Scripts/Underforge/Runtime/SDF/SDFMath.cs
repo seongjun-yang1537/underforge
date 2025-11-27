@@ -11,7 +11,7 @@ namespace Underforge
             return lerp(p1, p2, t);
         }
 
-        public static float3 CalculatenormalFromGrid(ref SDFVolume volume, int3 idx)
+        public static float3 CalculateNormal(ref SDFVolume volume, int3 idx)
         {
             float dx = volume[idx + int3(1, 0, 0)] - volume[idx - int3(1, 0, 0)];
             float dy = volume[idx + int3(0, 1, 0)] - volume[idx - int3(0, 1, 0)];
