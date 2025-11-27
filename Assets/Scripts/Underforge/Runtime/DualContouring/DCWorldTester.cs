@@ -1,159 +1,227 @@
-using UnityEngine;
+using Corelib.Utils;
 using Cysharp.Threading.Tasks;
-using Underforge;
+using Unity.Collections;
+using Unity.Jobs;
 using Unity.Mathematics;
+using UnityEngine;
 
-public class DCWorldTester : MonoBehaviour
+namespace Underforge
 {
-    [Header("Components")]
-    [SerializeField] private DebugSDFGenerator debugSdfGenerator;
-    [SerializeField] private MeshFilter meshFilter;
-    [SerializeField] private MeshRenderer meshRenderer;
-    [SerializeField] private MeshCollider meshCollider; // 물리 충돌 테스트용
-
-    [Header("World Config")]
-    [SerializeField] private int3 worldSize = new int3(32, 32, 32);
-    [SerializeField] private float cellSize = 1f;
-    [SerializeField] private float isoLevel;
-    [SerializeField] private SDFGenerateConfig config = SDFGenerateConfig.DefaultPerlin;
-
-    [Header("Debug")]
-    [SerializeField] private bool autoGenerateOnStart = true;
-    [SerializeField] private bool showBounds = true;
-    [SerializeField] private bool regenerateVolumeOnGenerate = true;
-    [SerializeField] private bool buildVisualizerMesh;
-
-    private void OnValidate()
+    [DisallowMultipleComponent]
+    public class DCWorldTester : MonoBehaviour
     {
-        worldSize = new int3(math.max(1, worldSize.x), math.max(1, worldSize.y), math.max(1, worldSize.z));
-        cellSize = math.max(0.01f, cellSize);
-    }
+        [Header("Generation")]
+        [SerializeField] private Vector3Int volumeSize = new Vector3Int(32, 32, 32);
+        [SerializeField] private float cellSize = 1f;
+        [SerializeField] private float isoLevel;
+        [SerializeField] private bool autoGenerateOnEnable = true;
+        [SerializeField] private bool regenerateVolumeOnGenerate = true;
+        [SerializeField] private SDFGenerateConfig generateConfig = SDFGenerateConfig.DefaultPerlin;
 
-    private void Start()
-    {
-        if (meshRenderer.sharedMaterial == null)
+        [Header("Visualization")]
+        [SerializeField] private bool drawSdfGizmos = true;
+        [SerializeField] private bool buildMesh;
+        [SerializeField] private MeshFilter meshFilter;
+        [SerializeField] private MeshRenderer meshRenderer;
+        [SerializeField] private MeshCollider meshCollider;
+
+        [Header("Dual Contouring Debug")]
+        [SerializeField] private bool drawDualContouringDebug;
+        [SerializeField] private float normalScale = 0.2f;
+        [SerializeField] private float vertexRadius = 0.08f;
+
+        private SDFVolume volume;
+        private Mesh generatedMesh;
+        private DualContouringDebugData lastDebugData;
+
+        private void OnEnable()
         {
-            meshRenderer.sharedMaterial = new Material(Shader.Find("Standard"));
+            if (autoGenerateOnEnable)
+            {
+                Generate().Forget();
+            }
         }
 
-        ResolveGenerator();
-
-        if (autoGenerateOnStart)
+        private void OnDisable()
         {
-            Generate().Forget();
-        }
-    }
-
-    // 버튼으로 호출하거나 코드로 호출
-    [ContextMenu("Generate World")]
-    public void GenerateWorldFromInspector()
-    {
-        if (Application.isPlaying)
-        {
-            Generate().Forget();
-        }
-        else
-        {
-            Debug.LogWarning("Job System은 Play Mode에서 테스트하는 게 안전해!");
-        }
-    }
-
-    private async UniTaskVoid Generate()
-    {
-        DebugSDFGenerator generator = ResolveGenerator();
-
-        if (generator == null)
-        {
-            Debug.LogError("DebugSDFGenerator가 필요해.");
-            return;
+            DisposeResources();
         }
 
-        Debug.Log("Start Generating Mesh...");
-        float startTime = Time.realtimeSinceStartup;
-
-        generator.ApplySettings(new Vector3Int(worldSize.x, worldSize.y, worldSize.z), cellSize, isoLevel, config, showBounds, buildVisualizerMesh);
-
-        if (regenerateVolumeOnGenerate || !generator.HasVolume)
+        private void OnDestroy()
         {
-            generator.GenerateVolume();
+            DisposeResources();
         }
 
-        if (!generator.HasVolume)
+        private void OnValidate()
         {
-            Debug.LogError("SDF 볼륨 생성에 실패했어.");
-            return;
+            volumeSize = new Vector3Int(math.max(1, volumeSize.x), math.max(1, volumeSize.y), math.max(1, volumeSize.z));
+            cellSize = math.max(0.01f, cellSize);
         }
 
-        SDFVolume volume = generator.Volume;
-        Mesh mesh = await DualContouring.GenerateMeshAsync(volume, generator.GenerateConfig);
-
-        mesh.name = "DC Generated Mesh";
-        meshFilter.mesh = mesh;
-
-        if (meshCollider != null)
+        [ContextMenu("Generate World")]
+        public void GenerateWorldFromInspector()
         {
-            meshCollider.sharedMesh = mesh;
-        }
+            if (!Application.isPlaying)
+            {
+                Debug.LogWarning("Play Mode에서 실행해야 해.");
+                return;
+            }
 
-        float duration = Time.realtimeSinceStartup - startTime;
-        Debug.Log($"<color=green>Mesh Generated!</color> Time: {duration * 1000f:F2}ms");
-    }
-
-    private DebugSDFGenerator ResolveGenerator()
-    {
-        if (debugSdfGenerator == null)
-        {
-            debugSdfGenerator = GetComponent<DebugSDFGenerator>();
-        }
-
-        return debugSdfGenerator;
-    }
-
-    // 디버그용 화면 UI
-    private void OnGUI()
-    {
-        GUILayout.BeginArea(new Rect(10, 10, 200, 300));
-
-        GUILayout.Label("<b>DC Tester Controls</b>");
-
-        if (GUILayout.Button("Regenerate Mesh"))
-        {
             Generate().Forget();
         }
 
-        GUILayout.Space(10);
-        GUILayout.Label($"Type: {config.type}");
+        public bool HasVolume => volume.densities.IsCreated;
 
-        // 간단한 파라미터 조절 슬라이더
-        GUILayout.Label($"Noise Scale: {config.noiseScale:F3}");
-        config.noiseScale = GUILayout.HorizontalSlider(config.noiseScale, 0.01f, 0.2f);
+        public SDFVolume Volume => volume;
 
-        GUILayout.Label($"Amplitude: {config.noiseAmplitude:F1}");
-        config.noiseAmplitude = GUILayout.HorizontalSlider(config.noiseAmplitude, 1f, 20f);
+        public SDFGenerateConfig GenerateConfig => generateConfig;
 
-        GUILayout.Label($"Offset: {config.offset:F1}");
-        config.offset = GUILayout.HorizontalSlider(config.offset, 0f, 32f);
-
-        GUILayout.EndArea();
-    }
-
-    private void OnDrawGizmos()
-    {
-        if (!showBounds)
+        private async UniTaskVoid Generate()
         {
-            return;
+            if (meshRenderer != null && meshRenderer.sharedMaterial == null)
+            {
+                meshRenderer.sharedMaterial = new Material(Shader.Find("Standard"));
+            }
+
+            if (regenerateVolumeOnGenerate || !HasVolume)
+            {
+                GenerateVolume();
+            }
+
+            if (!HasVolume)
+            {
+                Debug.LogError("SDF 볼륨 생성에 실패했어.");
+                return;
+            }
+
+            if (!buildMesh)
+            {
+                return;
+            }
+
+            float startTime = Time.realtimeSinceStartup;
+            Mesh mesh = await DualContouring.GenerateMeshAsync(volume, generateConfig);
+            lastDebugData = DualContouring.LastDebugData;
+
+            mesh.name = "DC Generated Mesh";
+            AssignMesh(mesh);
+
+            float duration = Time.realtimeSinceStartup - startTime;
+            Debug.Log($"<color=green>Mesh Generated!</color> Time: {duration * 1000f:F2}ms");
         }
 
-        DebugSDFGenerator generator = ResolveGenerator();
-
-        if (generator != null && generator.HasVolume)
+        private void GenerateVolume()
         {
-            SDFVolumeVisualizer.DrawGizmos(generator.Volume, generator.IsoLevel, generator.CellSize);
-            return;
+            DisposeVolume();
+
+            int3 size = new int3(volumeSize.x, volumeSize.y, volumeSize.z);
+            volume = new SDFVolume((float3)transform.position, size, Allocator.Persistent);
+
+            MT19937 noiseGenerator = MT19937.Create();
+            SDFGenerateConfig config = generateConfig;
+            config.noiseSeed = new float2(noiseGenerator.NextFloat() * 100f, noiseGenerator.NextFloat() * 100f);
+
+            JobHandle handle = SDFVolumeGenerator.Generate(volume, config);
+            handle.Complete();
         }
 
-        Gizmos.color = Color.cyan;
-        Vector3 boundsSize = new Vector3(worldSize.x, worldSize.y, worldSize.z) * cellSize;
-        Gizmos.DrawWireCube(transform.position, boundsSize);
+        private void AssignMesh(Mesh mesh)
+        {
+            if (generatedMesh != null)
+            {
+                if (Application.isPlaying)
+                {
+                    Destroy(generatedMesh);
+                }
+                else
+                {
+                    DestroyImmediate(generatedMesh);
+                }
+            }
+
+            generatedMesh = mesh;
+
+            MeshFilter targetFilter = meshFilter != null ? meshFilter : GetComponent<MeshFilter>();
+            if (targetFilter != null)
+            {
+                targetFilter.sharedMesh = generatedMesh;
+            }
+
+            if (meshCollider != null)
+            {
+                meshCollider.sharedMesh = generatedMesh;
+            }
+        }
+
+        private void DisposeResources()
+        {
+            if (generatedMesh != null)
+            {
+                if (Application.isPlaying)
+                {
+                    Destroy(generatedMesh);
+                }
+                else
+                {
+                    DestroyImmediate(generatedMesh);
+                }
+
+                generatedMesh = null;
+            }
+
+            DisposeVolume();
+        }
+
+        private void DisposeVolume()
+        {
+            if (volume.densities.IsCreated)
+            {
+                volume.Dispose();
+            }
+        }
+
+        private void OnGUI()
+        {
+            GUILayout.BeginArea(new Rect(10, 10, 260, 340));
+
+            GUILayout.Label("<b>Dual Contouring Tester</b>");
+
+            if (GUILayout.Button("Regenerate"))
+            {
+                Generate().Forget();
+            }
+
+            GUILayout.Space(8f);
+            GUILayout.Label($"Noise Scale: {generateConfig.noiseScale:F3}");
+            generateConfig.noiseScale = GUILayout.HorizontalSlider(generateConfig.noiseScale, 0.01f, 0.2f);
+
+            GUILayout.Label($"Amplitude: {generateConfig.noiseAmplitude:F1}");
+            generateConfig.noiseAmplitude = GUILayout.HorizontalSlider(generateConfig.noiseAmplitude, 1f, 20f);
+
+            GUILayout.Label($"Offset: {generateConfig.offset:F1}");
+            generateConfig.offset = GUILayout.HorizontalSlider(generateConfig.offset, 0f, 32f);
+
+            GUILayout.EndArea();
+        }
+
+        private void OnDrawGizmos()
+        {
+            if (drawSdfGizmos && HasVolume)
+            {
+                SDFVolumeVisualizer.DrawGizmos(volume, isoLevel, cellSize);
+            }
+            else
+            {
+                Gizmos.color = Color.cyan;
+                Vector3 boundsSize = new Vector3(volumeSize.x, volumeSize.y, volumeSize.z) * cellSize;
+                Gizmos.DrawWireCube(transform.position, boundsSize);
+            }
+
+            if (drawDualContouringDebug)
+            {
+                DualContouringDebugData debugData = lastDebugData ?? DualContouring.LastDebugData;
+                DualContoruingVisualizer.DrawAll(debugData, normalScale, vertexRadius);
+            }
+        }
     }
 }
