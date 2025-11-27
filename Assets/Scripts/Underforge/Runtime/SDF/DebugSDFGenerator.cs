@@ -1,3 +1,4 @@
+using Corelib.Utils;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
@@ -33,6 +34,9 @@ namespace Underforge
 
         [Group("Generation"), SerializeField]
         private SDFGenerateConfig generateConfig = SDFGenerateConfig.DefaultPerlin;
+
+        [Group("Generation"), SerializeField]
+        private int noiseSeed;
 
         private SDFVolume volume;
         private Mesh generatedMesh;
@@ -74,7 +78,11 @@ namespace Underforge
             int3 size = new int3(volumeSize.x, volumeSize.y, volumeSize.z);
             volume = new SDFVolume((float3)transform.position, size, Allocator.Persistent);
 
-            JobHandle handle = SDFVolumeGenerator.Generate(volume, generateConfig);
+            MT19937 generator = MT19937.Create(noiseSeed);
+            SDFGenerateConfig config = generateConfig;
+            config.noiseSeed = new float2(generator.NextFloat(), generator.NextFloat());
+
+            JobHandle handle = SDFVolumeGenerator.Generate(volume, config);
             handle.Complete();
 
             if (buildMesh)
