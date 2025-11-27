@@ -6,25 +6,37 @@ using Unity.Mathematics;
 public class DCWorldTester : MonoBehaviour
 {
     [Header("Components")]
-    public MeshFilter meshFilter;
-    public MeshRenderer meshRenderer;
-    public MeshCollider meshCollider; // 물리 충돌 테스트용
+    [SerializeField] private DebugSDFGenerator debugSdfGenerator;
+    [SerializeField] private MeshFilter meshFilter;
+    [SerializeField] private MeshRenderer meshRenderer;
+    [SerializeField] private MeshCollider meshCollider; // 물리 충돌 테스트용
 
     [Header("World Config")]
-    public int3 worldSize = new int3(32, 32, 32);
-    public SDFGenerateConfig config = SDFGenerateConfig.DefaultPerlin;
+    [SerializeField] private int3 worldSize = new int3(32, 32, 32);
+    [SerializeField] private float cellSize = 1f;
+    [SerializeField] private float isoLevel;
+    [SerializeField] private SDFGenerateConfig config = SDFGenerateConfig.DefaultPerlin;
 
     [Header("Debug")]
-    public bool autoGenerateOnStart = true;
-    public bool showBounds = true;
+    [SerializeField] private bool autoGenerateOnStart = true;
+    [SerializeField] private bool showBounds = true;
+    [SerializeField] private bool regenerateVolumeOnGenerate = true;
+    [SerializeField] private bool buildVisualizerMesh;
+
+    private void OnValidate()
+    {
+        worldSize = new int3(math.max(1, worldSize.x), math.max(1, worldSize.y), math.max(1, worldSize.z));
+        cellSize = math.max(0.01f, cellSize);
+    }
 
     private void Start()
     {
-        // 렌더러에 재질이 없으면 핑크색으로 나오니까 기본 재질 할당 체크
         if (meshRenderer.sharedMaterial == null)
         {
             meshRenderer.sharedMaterial = new Material(Shader.Find("Standard"));
         }
+
+        ResolveGenerator();
 
         if (autoGenerateOnStart)
         {
@@ -48,25 +60,53 @@ public class DCWorldTester : MonoBehaviour
 
     private async UniTaskVoid Generate()
     {
+        DebugSDFGenerator generator = ResolveGenerator();
+
+        if (generator == null)
+        {
+            Debug.LogError("DebugSDFGenerator가 필요해.");
+            return;
+        }
+
         Debug.Log("Start Generating Mesh...");
         float startTime = Time.realtimeSinceStartup;
 
-        // 1. Volume 메모리 할당
-        using (var volume = new SDFVolume(transform.position, worldSize, Unity.Collections.Allocator.Persistent))
+        generator.ApplySettings(new Vector3Int(worldSize.x, worldSize.y, worldSize.z), cellSize, isoLevel, config, showBounds, buildVisualizerMesh);
+
+        if (regenerateVolumeOnGenerate || !generator.HasVolume)
         {
-            // 2. Dual Contouring 실행 (비동기)
-            Mesh mesh = await DualContouring.GenerateMeshAsync(volume, config);
+            generator.GenerateVolume();
+        }
 
-            // 3. 결과 적용
-            mesh.name = "DC Generated Mesh";
-            meshFilter.mesh = mesh;
+        if (!generator.HasVolume)
+        {
+            Debug.LogError("SDF 볼륨 생성에 실패했어.");
+            return;
+        }
 
-            if (meshCollider != null)
-                meshCollider.sharedMesh = mesh;
+        SDFVolume volume = generator.Volume;
+        Mesh mesh = await DualContouring.GenerateMeshAsync(volume, generator.GenerateConfig);
+
+        mesh.name = "DC Generated Mesh";
+        meshFilter.mesh = mesh;
+
+        if (meshCollider != null)
+        {
+            meshCollider.sharedMesh = mesh;
         }
 
         float duration = Time.realtimeSinceStartup - startTime;
         Debug.Log($"<color=green>Mesh Generated!</color> Time: {duration * 1000f:F2}ms");
+    }
+
+    private DebugSDFGenerator ResolveGenerator()
+    {
+        if (debugSdfGenerator == null)
+        {
+            debugSdfGenerator = GetComponent<DebugSDFGenerator>();
+        }
+
+        return debugSdfGenerator;
     }
 
     // 디버그용 화면 UI
@@ -99,8 +139,21 @@ public class DCWorldTester : MonoBehaviour
 
     private void OnDrawGizmos()
     {
-        if (!showBounds) return;
+        if (!showBounds)
+        {
+            return;
+        }
+
+        DebugSDFGenerator generator = ResolveGenerator();
+
+        if (generator != null && generator.HasVolume)
+        {
+            SDFVolumeVisualizer.DrawGizmos(generator.Volume, generator.IsoLevel, generator.CellSize);
+            return;
+        }
+
         Gizmos.color = Color.cyan;
-        Gizmos.DrawWireCube(transform.position, (Vector3)(float3)worldSize);
+        Vector3 boundsSize = new Vector3(worldSize.x, worldSize.y, worldSize.z) * cellSize;
+        Gizmos.DrawWireCube(transform.position, boundsSize);
     }
 }
