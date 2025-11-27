@@ -7,7 +7,7 @@ namespace Underforge
     {
         public static float3 Interpolate(float3 p1, float3 p2, float v1, float v2)
         {
-            float t = -v1 / (v2 - v1);
+            float t = (abs(v1 - v2) > 0.00001f) ? (-v1 / (v2 - v1)) : 0.5f;
             return lerp(p1, p2, t);
         }
 
