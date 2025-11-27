@@ -1,3 +1,4 @@
+using Corelib.Utils;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
@@ -74,7 +75,11 @@ namespace Underforge
             int3 size = new int3(volumeSize.x, volumeSize.y, volumeSize.z);
             volume = new SDFVolume((float3)transform.position, size, Allocator.Persistent);
 
-            JobHandle handle = SDFVolumeGenerator.Generate(volume, generateConfig);
+            MT19937 noiseGenerator = MT19937.Create();
+            SDFGenerateConfig config = generateConfig;
+            config.noiseSeed = new float2(noiseGenerator.NextFloat(), noiseGenerator.NextFloat());
+
+            JobHandle handle = SDFVolumeGenerator.Generate(volume, config);
             handle.Complete();
 
             if (buildMesh)
