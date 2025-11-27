@@ -3,3 +3,4 @@
 
 [codex] DebugSDFGenerator에 TriInspector 그룹과 버튼을 추가해 볼륨 생성, 메시 생성, 자원 해제를 인스펙터에서 바로 수행할 수 있음.
 [codex] DebugSDFGenerator가 MT19937 기반 난수로 노이즈 시드를 설정하도록 업데이트됨.
+[codex] DebugSDFGenerator가 볼륨 생성마다 자동으로 새로운 MT19937 노이즈 시드를 사용하도록 변경됨.
