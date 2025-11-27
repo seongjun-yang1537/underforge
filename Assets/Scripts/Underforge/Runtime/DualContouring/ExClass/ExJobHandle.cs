@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 
 namespace Underforge
 {
-    public static class JobHandleExtension
+    public static class ExJobHandle
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static async UniTask ToUniTask(this JobHandle handle)
