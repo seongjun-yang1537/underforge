@@ -5,3 +5,4 @@
 [codex] DebugSDFGenerator가 MT19937 기반 난수로 노이즈 시드를 설정하도록 업데이트됨.
 [codex] DebugSDFGenerator가 볼륨 생성마다 자동으로 새로운 MT19937 노이즈 시드를 사용하도록 변경됨.
 [codex] DebugSDFGenerator가 ApplySettings와 공개 프로퍼티로 설정을 공유하고 외부 컴포넌트가 생성된 SDF 볼륨을 재사용할 수 있게 변경됨.
+[codex] DebugSDFGenerator가 DCWorldTester를 상속하는 얇은 래퍼로 전환되어 Dual Contouring 통합 스크립트와 동일한 동작을 사용함.
