@@ -13,17 +13,20 @@ namespace Underforge
         {
             await SDFVolumeGenerator.Generate(volume, config).ToUniTask();
 
-            int maxVoxels = volume.size.x * volume.size.y * volume.size.z;
-            int estimatedEdges = maxVoxels * 3;
-            int estimatedVerts = maxVoxels / 2;
+            int xEdges = (volume.size.x - 1) * volume.size.y * volume.size.z;
+            int yEdges = volume.size.x * (volume.size.y - 1) * volume.size.z;
+            int zEdges = volume.size.x * volume.size.y * (volume.size.z - 1);
+            int edgeCapacity = math.max(xEdges + yEdges + zEdges, 1);
+            int vertexCapacity = math.max((volume.size.x - 1) * (volume.size.y - 1) * (volume.size.z - 1), 1);
+            int indexCapacity = math.max(edgeCapacity * 6, 1);
 
-            var hermiteEdges = new NativeParallelHashMap<int, DCHermiteData>(estimatedEdges, Allocator.Persistent);
-            var vertices = new NativeParallelHashMap<int, DCVertex>(estimatedVerts, Allocator.Persistent);
-            var voxelToMeshIndex = new NativeParallelHashMap<int, int>(estimatedVerts, Allocator.Persistent);
+            var hermiteEdges = new NativeParallelHashMap<int, DCHermiteData>(edgeCapacity, Allocator.Persistent);
+            var vertices = new NativeParallelHashMap<int, DCVertex>(vertexCapacity, Allocator.Persistent);
+            var voxelToMeshIndex = new NativeParallelHashMap<int, int>(vertexCapacity, Allocator.Persistent);
 
-            var outPositions = new NativeList<float3>(estimatedVerts, Allocator.Persistent);
-            var outNormals = new NativeList<float3>(estimatedVerts, Allocator.Persistent);
-            var outIndices = new NativeList<int>(estimatedVerts * 6, Allocator.Persistent);
+            var outPositions = new NativeList<float3>(vertexCapacity, Allocator.Persistent);
+            var outNormals = new NativeList<float3>(vertexCapacity, Allocator.Persistent);
+            var outIndices = new NativeList<int>(indexCapacity, Allocator.Persistent);
 
             try
             {

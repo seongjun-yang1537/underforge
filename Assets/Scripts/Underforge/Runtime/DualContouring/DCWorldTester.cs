@@ -3,6 +3,8 @@ using Cysharp.Threading.Tasks;
 using Underforge;
 using Unity.Mathematics;
 
+[RequireComponent(typeof(MeshFilter))]
+[RequireComponent(typeof(MeshRenderer))]
 public class DCWorldTester : MonoBehaviour
 {
     [Header("Components")]
@@ -18,9 +20,25 @@ public class DCWorldTester : MonoBehaviour
     public bool autoGenerateOnStart = true;
     public bool showBounds = true;
 
+    private void Awake()
+    {
+        CacheComponents();
+    }
+
+    private void OnValidate()
+    {
+        CacheComponents();
+    }
+
     private void Start()
     {
-        // 렌더러에 재질이 없으면 핑크색으로 나오니까 기본 재질 할당 체크
+        if (meshRenderer == null || meshFilter == null)
+        {
+            Debug.LogError("메시 필터나 렌더러가 비어 있습니다. 컴포넌트를 확인하세요.");
+            enabled = false;
+            return;
+        }
+
         if (meshRenderer.sharedMaterial == null)
         {
             meshRenderer.sharedMaterial = new Material(Shader.Find("Standard"));
@@ -30,6 +48,18 @@ public class DCWorldTester : MonoBehaviour
         {
             Generate().Forget();
         }
+    }
+
+    private void CacheComponents()
+    {
+        if (meshFilter == null)
+            meshFilter = GetComponent<MeshFilter>();
+
+        if (meshRenderer == null)
+            meshRenderer = GetComponent<MeshRenderer>();
+
+        if (meshCollider == null)
+            meshCollider = GetComponent<MeshCollider>();
     }
 
     // 버튼으로 호출하거나 코드로 호출
