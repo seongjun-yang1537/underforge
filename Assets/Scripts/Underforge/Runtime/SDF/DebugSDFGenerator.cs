@@ -2,33 +2,36 @@ using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
+using TriInspector;
 
 namespace Underforge
 {
+    [DeclareBoxGroup("Generation", Title = "Generation Settings")]
+    [DeclareBoxGroup("Visualization", Title = "Visualization Settings")]
     public class DebugSDFGenerator : MonoBehaviour
     {
-        [SerializeField]
+        [Group("Generation"), SerializeField]
         private Vector3Int volumeSize = new Vector3Int(16, 16, 16);
 
-        [SerializeField]
+        [Group("Generation"), SerializeField]
         private float cellSize = 1f;
 
-        [SerializeField]
+        [Group("Generation"), SerializeField]
         private float isoLevel;
 
-        [SerializeField]
+        [Group("Generation"), SerializeField]
         private bool autoGenerateOnEnable = true;
 
-        [SerializeField]
+        [Group("Visualization"), SerializeField]
         private bool drawGizmos = true;
 
-        [SerializeField]
+        [Group("Visualization"), SerializeField]
         private bool buildMesh;
 
-        [SerializeField]
+        [Group("Visualization"), SerializeField]
         private MeshFilter meshFilter;
 
-        [SerializeField]
+        [Group("Generation"), SerializeField]
         private SDFGenerateConfig generateConfig = SDFGenerateConfig.DefaultPerlin;
 
         private SDFVolume volume;
@@ -63,6 +66,7 @@ namespace Underforge
             }
         }
 
+        [Button("Generate Volume")]
         public void GenerateVolume()
         {
             DisposeResources();
@@ -77,6 +81,12 @@ namespace Underforge
             {
                 UpdateMesh();
             }
+        }
+
+        [Button("Generate Mesh"), EnableIf(nameof(HasVolume))]
+        public void GenerateMesh()
+        {
+            UpdateMesh();
         }
 
         private void OnDrawGizmos()
@@ -124,6 +134,7 @@ namespace Underforge
             }
         }
 
+        [Button("Dispose Resources"), EnableIf(nameof(HasVolume))]
         private void DisposeResources()
         {
             if (generatedMesh != null)
@@ -145,5 +156,7 @@ namespace Underforge
                 volume.Dispose();
             }
         }
+
+        private bool HasVolume => volume.densities.IsCreated;
     }
 }
