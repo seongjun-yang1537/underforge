@@ -7,7 +7,7 @@ using static Unity.Mathematics.math;
 namespace Underforge
 {
     [BurstCompile]
-    public class DCGenerateVerticesJob : IJobParallelFor
+    public struct DCGenerateVerticesJob : IJobParallelFor
     {
         [ReadOnly] public SDFVolume volume;
         [ReadOnly] public NativeParallelHashMap<int, DCHermiteData> hermiteEdges;

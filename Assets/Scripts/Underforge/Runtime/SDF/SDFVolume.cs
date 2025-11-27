@@ -28,7 +28,7 @@ namespace Underforge
 
         public float this[int3 idx]
         {
-            get => Contains(idx) ? densities[FlattenIndex(idx)] : float.MaxValue;
+            get => Contains(idx) ? densities[FlattenIndex(idx)] : 100f;
             set { if (Contains(idx)) densities[FlattenIndex(idx)] = value; }
         }
 
