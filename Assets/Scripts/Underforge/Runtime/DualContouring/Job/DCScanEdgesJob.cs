@@ -11,7 +11,7 @@ namespace Underforge
     {
         [ReadOnly] public SDFVolume volume;
 
-        [WriteOnly] public NativeParallelHashMap<int, HermiteData>.ParallelWriter hermiteEdges;
+        [WriteOnly] public NativeParallelHashMap<int, DCHermiteData>.ParallelWriter hermiteEdges;
 
         public void Execute(int index)
         {
@@ -75,7 +75,7 @@ namespace Underforge
             int3 closerIdx = abs(d0) < abs(d1) ? idx : (idx + (axis == 0 ? int3(1, 0, 0) : axis == 1 ? int3(0, 1, 0) : int3(0, 0, 1)));
             float3 normal = SDFMath.CalculateNormal(ref volume, closerIdx);
 
-            HermiteData data = new HermiteData
+            DCHermiteData data = new DCHermiteData
             {
                 position = intersectionPos,
                 normal = normal
