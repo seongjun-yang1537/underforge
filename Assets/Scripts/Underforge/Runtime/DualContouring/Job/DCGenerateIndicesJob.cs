@@ -33,7 +33,12 @@ namespace Underforge
 
         private void ProcessEdge(int3 idx, int axis)
         {
-            int edgeKey = DCEdgeHelper.CompressEdgeIndex(idx, axis);
+
+            int3 edgePos = idx;
+            if (axis == 0) edgePos += int3(0, 1, 1);
+            else if (axis == 1) edgePos += int3(1, 0, 1);
+            else if (axis == 2) edgePos += int3(1, 1, 0);
+            int edgeKey = DCEdgeHelper.CompressEdgeIndex(edgePos, axis);
 
             if (!hermiteEdges.ContainsKey(edgeKey)) return;
 

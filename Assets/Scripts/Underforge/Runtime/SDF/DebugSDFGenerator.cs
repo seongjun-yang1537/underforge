@@ -77,7 +77,7 @@ namespace Underforge
 
             MT19937 noiseGenerator = MT19937.Create();
             SDFGenerateConfig config = generateConfig;
-            config.noiseSeed = new float2(noiseGenerator.NextFloat(), noiseGenerator.NextFloat());
+            config.noiseSeed = new float2(noiseGenerator.NextFloat() * 100f, noiseGenerator.NextFloat() * 100f);
 
             JobHandle handle = SDFVolumeGenerator.Generate(volume, config);
             handle.Complete();
