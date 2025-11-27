@@ -38,6 +38,18 @@ namespace Underforge
         private SDFVolume volume;
         private Mesh generatedMesh;
 
+        public Vector3Int VolumeSize => volumeSize;
+
+        public float CellSize => cellSize;
+
+        public float IsoLevel => isoLevel;
+
+        public SDFGenerateConfig GenerateConfig => generateConfig;
+
+        public bool HasVolume => volume.densities.IsCreated;
+
+        public SDFVolume Volume => volume;
+
         private void OnEnable()
         {
             if (autoGenerateOnEnable)
@@ -92,6 +104,16 @@ namespace Underforge
         public void GenerateMesh()
         {
             UpdateMesh();
+        }
+
+        public void ApplySettings(Vector3Int newVolumeSize, float newCellSize, float newIsoLevel, SDFGenerateConfig newConfig, bool enableGizmos, bool enableMesh)
+        {
+            volumeSize = new Vector3Int(math.max(1, newVolumeSize.x), math.max(1, newVolumeSize.y), math.max(1, newVolumeSize.z));
+            cellSize = math.max(0.01f, newCellSize);
+            isoLevel = newIsoLevel;
+            drawGizmos = enableGizmos;
+            buildMesh = enableMesh;
+            generateConfig = newConfig;
         }
 
         private void OnDrawGizmos()
@@ -161,7 +183,5 @@ namespace Underforge
                 volume.Dispose();
             }
         }
-
-        private bool HasVolume => volume.densities.IsCreated;
     }
 }
